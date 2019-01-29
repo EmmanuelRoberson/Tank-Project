@@ -133,14 +133,12 @@ void Application3D::update(float deltaTime)
 	}
 
 	// input :: shoots the bullet in the direction of the turret
-	//that 40 is arbitrary as fuck but can be variablized into something meaningful like speed
-	//you could then set it to 40 when "shotsFired" and 0 after some timer
 	vec3 forward_bullet = vec3(abrams.turret_barrel[2].x, abrams.turret_barrel[2].z, -abrams.turret_barrel[2].y) * (40 * deltaTime);
-	forward_bullet = abrams.turret_base[3].xyz;
+	//vec3 forward_bullet = abrams.turret_base[3].xyz;
 	if (input->isKeyDown(aie::INPUT_KEY_SPACE))
 	{
 		abrams.turret_bullet_size = 0.4f;
-		abrams.turret_bullet_translation = glm::translate(glm::mat4(1), forward_bullet + glm::vec3(2,0,0));
+		abrams.turret_bullet_translation = glm::translate(abrams.turret_bullet_translation, forward_bullet);
 	}
 	else
 	{
