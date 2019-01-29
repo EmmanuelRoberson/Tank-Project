@@ -41,7 +41,8 @@ void Application3D::shutdown() {
 	Gizmos::destroy();
 }
 
-struct tank
+//struct for the Tank
+struct Tank
 {
 	mat4 world = mat4(1);
 
@@ -53,54 +54,31 @@ struct tank
 	mat4 turret_base_translation = glm::translate(turret_base, vec3(0, 0.5, 0));
 	mat4 turret_base_rotation = glm::rotate(turret_base, 0.0f, vec3(0, 1, 0));
 
+
+	//using a parent for this object will expose a transform that can be used for pitch
+	//the completed heirarchy would look like this in Unity
+	/* -tank_base
+	 * --turret_base
+	 *  --barrel_root
+	 *  ---barrel
+	 */
 	mat4 turret_barrel = glm::translate(turret_base, vec3(0, 0.3, 0.3));
-	mat4 turret_barrel_offset = glm::translate(turret_base, vec3(0, 0.3, 0.3));
 	mat4 turret_barrel_translation = glm::translate(turret_barrel, vec3(0, 0, 0));
 	mat4 turret_barrel_rotation = glm::rotate(turret_barrel, 1.57f, vec3(1, 0, 0));
+
+	mat4 turret_bullet = glm::translate(turret_base, vec3(0, 0.3, 0.3));
+	mat4 turret_bullet_translation = glm::translate(turret_barrel, vec3(0, 0, 1));
+	mat4 turret_bullet_rotation = glm::rotate(turret_bullet, 1.57f, vec3(0, 0, 1));
+
+	float turret_bullet_size = 0.4f;
+
 };
 
-struct axisRotation
+// Tank
+Tank abrams;
+
+void Application3D::update(float deltaTime) 
 {
-	float deg = 0.f;
-	float ninety = 90.f;
-
-	// index[1] will return 0, cos(deg), sin(deg), 0
-	mat4 x_rot_degrees = mat4(
-		1.f, 0.f, 0.f, 0.f,
-		0.f, cos(deg), sin(deg), 0.f,
-		0.f, -sin(deg), cos(deg), 0.f,
-		0.f, 0.f, 0.f, 1.f);
-
-	mat4 y_rot_degrees = mat4(
-		cos(deg), 0.f, -sin(deg), 0.f,
-		0.f, 1.f, 0.f, 0.f,
-		sin(deg), 0.f, cos(deg), 0.f,
-		0.f, 0.f, 0.f, 1.f);
-
-	mat4 z_rot_degrees = mat4(
-		cos(deg), sin(deg), 0.f, 0.f,
-		-sin(deg), cos(deg), 0.f, 0.f,
-		0.f, 0.f, 0.f, 0.f,
-		0.f, 0.f, 0.f, 1.f);
-
-	mat4 z_rot_90 = mat4(
-		cos(90), sin(90), 0.f, 0.f,
-		-sin(90), cos(90), 0.f, 0.f,
-		0.f, 0.f, 1.f, 0.f,
-		0.f, 0.f, 0.f, 1.f);
-
-	mat4 swivel_rotation = mat4(z_rot_90 * y_rot_degrees);
-};
-
-// tank and rotations
-tank abrams;
-
-float deg = 0.f;
-
-
-
-
-void Application3D::update(float deltaTime) {
 
 	// query time since application started
 	float time = getTime();
@@ -132,27 +110,70 @@ void Application3D::update(float deltaTime) {
 
 	// add a transform so that we can see the axis
 	Gizmos::addTransform(mat4(1));
-	
+
+	// transform matrices for the Tank
 	abrams.tank_base = abrams.world * abrams.tank_base_translation * abrams.tank_base_rotation;
-	abrams.turret_base = abrams.tank_base * abrams.turret_base_translation * abrams.tank_base_rotation;
-	abrams.turret_barrel = abrams.tank_base * abrams.turret_barrel_translation * abrams.turret_barrel_rotation;
+	abrams.turret_base = abrams.world * abrams.turret_base_translation * abrams.turret_base_rotation;
+	abrams.turret_barrel = abrams.turret_base * abrams.turret_barrel_translation * abrams.turret_barrel_rotation;
+	//the bullet has no parent, it has an initial rotation of the barrels rotation in world 
+	abrams.turret_bullet = abrams.turret_base *   abrams.turret_bullet_translation * abrams.turret_bullet_rotation;
 
-	// demonstrate a few shapes
-	Gizmos::addAABBFilled(abrams.world[3], vec3(1,0.5,1), green, &abrams.tank_base);
-	Gizmos::addSphere(abrams.world[3], 0.8, 8, 8, blue, &abrams.turret_base);
-	Gizmos::addCylinderFilled(abrams.world[3], 0.3, 1, 15, black, &abrams.turret_barrel);
+	// input :: moves the Tank/turret base forward in the direction that its facing
 
-	vec3 forward = abrams.tank_base[2] * (10 * deltaTime);
+
+	//recommend seperating the vectors into magnitude and direction for readability and comprehension
+	//ex vec3 tank_dir = abrams.tank_base[2]; 
+	//float speed = 10 * deltaTime
+	//movement = tank_dir * speed;
+	vec3 forward_tank = abrams.tank_base[2] * (10 * deltaTime);
 	if (input->isKeyDown(aie::INPUT_KEY_W))
-		abrams.tank_base_translation = glm::translate(abrams.tank_base_translation, forward);
+	{
+		abrams.tank_base_translation = glm::translate(abrams.tank_base_translation, forward_tank);
+		abrams.turret_base_translation = glm::translate(abrams.turret_base_translation, forward_tank);
+	}
 
+	// input :: shoots the bullet in the direction of the turret
+	//that 40 is arbitrary as fuck but can be variablized into something meaningful like speed
+	//you could then set it to 40 when "shotsFired" and 0 after some timer
+	vec3 forward_bullet = vec3(abrams.turret_barrel[2].x, abrams.turret_barrel[2].z, -abrams.turret_barrel[2].y) * (40 * deltaTime);
+	forward_bullet = abrams.turret_base[3].xyz;
+	if (input->isKeyDown(aie::INPUT_KEY_SPACE))
+	{
+		abrams.turret_bullet_size = 0.4f;
+		abrams.turret_bullet_translation = glm::translate(glm::mat4(1), forward_bullet + glm::vec3(2,0,0));
+	}
+	else
+	{
+		abrams.turret_bullet_translation = abrams.turret_barrel_translation;
+		abrams.turret_bullet_size = 0.0f;
+	}
+
+	// input :: rotates the Tank left and right
 	if (input->isKeyDown(aie::INPUT_KEY_A))
 		abrams.tank_base_rotation = glm::rotate(abrams.tank_base_rotation, 0.1f, vec3(0, 1, 0));
 	if (input->isKeyDown(aie::INPUT_KEY_D))
 		abrams.tank_base_rotation = glm::rotate(abrams.tank_base_rotation, -0.1f, vec3(0, 1, 0));
 
+	// input :: rotate just the turret right and left
 	if (input->isKeyDown(aie::INPUT_KEY_RIGHT))
-		abrams.turret_barrel_rotation = abrams.turret_barrel_rotation * glm::rotate(-.1f, vec3(0,0,1));
+	{
+		abrams.turret_base_rotation = glm::rotate(abrams.turret_base_rotation, .05f, vec3(0,1,0));
+	}
+	if (input->isKeyDown(aie::INPUT_KEY_LEFT))
+	{
+		abrams.turret_base_rotation = glm::rotate(abrams.turret_base_rotation, -.05f, vec3(0, 1, 0));
+	}
+
+
+	Gizmos::addTransform(abrams.tank_base, 5);
+	Gizmos::addTransform(abrams.turret_base, 5);
+	Gizmos::addTransform(abrams.turret_barrel, 5);
+	// renders the Tank, Tank's turret base, and Tank's turret's base
+	Gizmos::addAABBFilled(abrams.world[3], vec3(1, 0.5, 1), green, &abrams.tank_base);
+	Gizmos::addSphere(abrams.world[3], 0.8, 8, 8, blue, &abrams.turret_base);
+	Gizmos::addCylinderFilled(abrams.world[3], 0.3, 1, 15, black, &abrams.turret_barrel);
+	Gizmos::addSphere(vec3(1), abrams.turret_bullet_size, 8, 8, white, &abrams.turret_bullet);
+
 
 	// quit if we press escape
 	if (input->isKeyDown(aie::INPUT_KEY_ESCAPE))
